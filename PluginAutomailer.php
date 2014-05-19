@@ -194,7 +194,7 @@ class PluginAutomailer extends ServicePlugin
                     if($template->getId() != $AutomailerRule->getTemplateID()){
                         $summaryErrors[] = $AutomailerRule->getTemplateID();
                     }else{
-                        $strEmailArrT = $template->getContents(true);
+                        $strEmailArrT = $template->getContents();
                         $strSubjectEmailT = $template->getSubject();
                         $strNameEmailT = $template->getName();
 
@@ -217,10 +217,7 @@ class PluginAutomailer extends ServicePlugin
                                     $gateway = new UserPackageGateway($this->user);
 
                                     $strSubjectEmail = $gateway->_replaceTags1($strSubjectEmail,$user,$package);
-                                    $strEmailArr = array(
-                                        'HTML'      => $gateway->_replaceTags1($strEmailArr['HTML'], $user, $package),
-                                        'plainText' => $gateway->_replaceTags1($strEmailArr['plainText'],$user,$package)
-                                    );
+                                    $strEmailArr = $gateway->_replaceTags1($strEmailArr, $user, $package);
 
                                     $gateway->_replaceTagsByType($userPackage,$user,$strEmailArr, $strSubjectEmail);
 
@@ -232,18 +229,12 @@ class PluginAutomailer extends ServicePlugin
                                         "[BILLINGEMAIL]"     => $this->settings->get("Billing E-mail")
                                     );
                                     $strSubjectEmail = str_replace(array_keys($additionalEmailTags), $additionalEmailTags, $strSubjectEmail);
-                                    $strEmailArr = array(
-                                        'HTML'      => str_replace(array_keys($additionalEmailTags), $additionalEmailTags, $strEmailArr['HTML']),
-                                        'plainText' => str_replace(array_keys($additionalEmailTags), $additionalEmailTags, $strEmailArr['plainText'])
-                                    );
+                                    $strEmailArr = str_replace(array_keys($additionalEmailTags), $additionalEmailTags, $strEmailArr);
                                 }else{
                                     $gateway = new UserPackageGateway($this->user);
 
                                     $strSubjectEmail = $gateway->_replaceTags1($strSubjectEmail,$user);
-                                    $strEmailArr = array(
-                                        'HTML'      => $gateway->_replaceTags1($strEmailArr['HTML'], $user),
-                                        'plainText' => $gateway->_replaceTags1($strEmailArr['plainText'],$user)
-                                    );
+                                    $strEmailArr = $gateway->_replaceTags1($strEmailArr, $user);
                                 }
 
                                 // * Send a parsed copy of the email template to the customer
@@ -259,13 +250,13 @@ class PluginAutomailer extends ServicePlugin
                                     'notifications',
                                     '',
                                     '',
-                                    $user->isHTMLMails()? MAILGATEWAY_CONTENTTYPE_HTML : MAILGATEWAY_CONTENTTYPE_PLAINTEXT
+                                    MAILGATEWAY_CONTENTTYPE_HTML
                                 );
 
                                 if (!($mailerResult instanceof CE_Error)) {
                                     // log the email sent
                                     $clientsEventLog = Client_EventLog::newInstance(false, $row['customer_id'], $row['customer_id'], CLIENT_EVENTLOG_SENTNOTIFICATIONEMAIL, $this->user->getId());
-                                    $clientsEventLog->setEmailSent($strSubjectEmail, $strEmailArr['HTML']);
+                                    $clientsEventLog->setEmailSent($strSubjectEmail, $strEmailArr);
                                     $clientsEventLog->save();
 
                                     //track the notification by adding it to the user_notifications table
