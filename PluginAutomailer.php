@@ -19,50 +19,50 @@ class PluginAutomailer extends ServicePlugin
     function getVariables()
     {
         $variables = array(
-            /*T*/'Plugin Name'/*/T*/   => array(
+            lang('Plugin Name')   => array(
                 'type'          => 'hidden',
-                'description'   => /*T*/''/*/T*/,
-                'value'         => /*T*/'Auto Mailer'/*/T*/,
+                'description'   => '',
+                'value'         => lang('Auto Mailer'),
             ),
-            /*T*/'Enabled'/*/T*/       => array(
+            lang('Enabled')       => array(
                 'type'          => 'yesno',
-                'description'   => /*T*/'When enabled, email customers a set number of days before/after a given event, defined on <a href="index.php?fuse=admin&controller=notifications&view=adminviewnotifications"><b><u>Accounts&nbsp;>&nbsp;Notifications</u></b></a>.<br><b>NOTE:</b> Only run once per day to avoid duplicate E-mails.'/*/T*/,
+                'description'   => lang('When enabled, email customers a set number of days before/after a given event, defined on <a href="index.php?fuse=admin&controller=notifications&view=adminviewnotifications"><b><u>Accounts&nbsp;>&nbsp;Notifications</u></b></a>.<br><b>NOTE:</b> Only run once per day to avoid duplicate E-mails.'),
                 'value'         => '0',
             ),
-            /*T*/'Summary E-mail'/*/T*/     => array(
+            lang('Summary E-mail')     => array(
                 'type'          => 'textarea',
-                'description'   => /*T*/'E-mail addresses to which a summary of each service run will be sent.  (Leave blank if you do not wish to receive a summary)'/*/T*/,
+                'description'   => lang('E-mail addresses to which a summary of each service run will be sent.  (Leave blank if you do not wish to receive a summary)'),
                 'value'         => '',
             ),
-            /*T*/'Summary E-mail Subject'/*/T*/     => array(
+            lang('Summary E-mail Subject')     => array(
                 'type'          => 'text',
-                'description'   => /*T*/'E-mail subject for the summary notification.'/*/T*/,
+                'description'   => lang('E-mail subject for the summary notification.'),
                 'value'         => 'Auto Mailer Summary',
             ),
-            /*T*/'Run schedule - Minute'/*/T*/  => array(
+            lang('Run schedule - Minute')  => array(
                 'type'          => 'text',
-                'description'   => /*T*/'Enter number, range, list or steps'/*/T*/,
+                'description'   => lang('Enter number, range, list or steps'),
                 'value'         => '0',
                 'helpid'        => '8',
             ),
-            /*T*/'Run schedule - Hour'/*/T*/  => array(
+            lang('Run schedule - Hour')  => array(
                 'type'          => 'text',
-                'description'   => /*T*/'Enter number, range, list or steps'/*/T*/,
+                'description'   => lang('Enter number, range, list or steps'),
                 'value'         => '0',
             ),
-            /*T*/'Run schedule - Day'/*/T*/  => array(
+            lang('Run schedule - Day')  => array(
                 'type'          => 'text',
-                'description'   => /*T*/'Enter number, range, list or steps'/*/T*/,
+                'description'   => lang('Enter number, range, list or steps'),
                 'value'         => '*',
             ),
-            /*T*/'Run schedule - Month'/*/T*/  => array(
+            lang('Run schedule - Month')  => array(
                 'type'          => 'text',
-                'description'   => /*T*/'Enter number, range, list or steps'/*/T*/,
+                'description'   => lang('Enter number, range, list or steps'),
                 'value'         => '*',
             ),
-            /*T*/'Run schedule - Day of the week'/*/T*/  => array(
+            lang('Run schedule - Day of the week')  => array(
                 'type'          => 'text',
-                'description'   => /*T*/'Enter number in range 0-6 (0 is Sunday) or a 3 letter shortcut (e.g. sun)'/*/T*/,
+                'description'   => lang('Enter number in range 0-6 (0 is Sunday) or a 3 letter shortcut (e.g. sun)'),
                 'value'         => '*',
             ),
         );
