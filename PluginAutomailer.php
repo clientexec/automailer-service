@@ -3,6 +3,7 @@
 require_once 'library/CE/NE_MailGateway.php';
 include_once 'modules/clients/models/Client_EventLog.php';
 require_once 'modules/admin/models/ServicePlugin.php';
+include_once 'modules/admin/models/StatusAliasGateway.php' ;
 require_once 'modules/support/models/AutoresponderTemplateGateway.php';
 require_once 'modules/clients/models/UserPackageGateway.php';
 require_once 'modules/admin/models/Package.php';
@@ -419,24 +420,26 @@ class PluginAutomailer extends ServicePlugin
 
             switch($Rules[0]['fieldname']){
                 case 'After Account Pending':
+                    $status = StatusAliasGateway::getInstance($this->user)->getUserStatusIdsFor(USER_STATUS_PENDING);
                     $query = "SELECT u.`id` AS customer_id "
                             ."FROM `users` u "
                             .$excludeJoin
                             ."WHERE u.`groupid` = 1 "
-                            ."AND u.`status` IN (".USER_STATUS_PENDING.") "
+                            ."AND u.`status` IN (".implode(', ', $status).") "
                             ."AND (UNIX_TIMESTAMP(u.`dateActivated`) >= ?) "
                             ."AND (UNIX_TIMESTAMP(u.`dateActivated`) < ?) "
                             .$excludeWhere;
                     $result = $this->db->query($query, $dateTimeStamp, $dateTimeStamp + 86400);
                     break;
                 case 'After Account Activated':
+                    $status = StatusAliasGateway::getInstance($this->user)->getUserStatusIdsFor(USER_STATUS_ACTIVE);
                     $query = "SELECT u.`id` AS customer_id "
                             ."FROM `users` u "
                             ."JOIN `user_customuserfields` ucuf "
                             ."ON u.`id` = ucuf.`userid` "
                             .$excludeJoin
                             ."WHERE u.`groupid` = 1 "
-                            ."AND u.`status` IN (".USER_STATUS_ACTIVE.") "
+                            ."AND u.`status` IN (".implode(', ', $status).") "
                             ."AND ucuf.`customid` IN ( "
                             ."SELECT cuf.`id` "
                             ."FROM `customuserfields` cuf "
@@ -448,13 +451,14 @@ class PluginAutomailer extends ServicePlugin
                     $result = $this->db->query($query, $dateTimeStamp, $dateTimeStamp + 86400);
                     break;
                 case 'After Account Canceled':  // Includes Canceled and Inactive Users
+                    $status = StatusAliasGateway::getInstance($this->user)->getUserStatusIdsFor(array(USER_STATUS_INACTIVE, USER_STATUS_CANCELLED));
                     $query = "SELECT u.`id` AS customer_id "
                             ."FROM `users` u "
                             ."JOIN `user_customuserfields` ucuf "
                             ."ON u.`id` = ucuf.`userid` "
                             .$excludeJoin
                             ."WHERE u.`groupid` = 1 "
-                            ."AND u.`status` IN (".USER_STATUS_INACTIVE.", ".USER_STATUS_CANCELLED.") "
+                            ."AND u.`status` IN (".implode(', ', $status).") "
                             ."AND ucuf.`customid` IN ( "
                             ."SELECT cuf.`id` "
                             ."FROM `customuserfields` cuf "
@@ -466,6 +470,7 @@ class PluginAutomailer extends ServicePlugin
                     $result = $this->db->query($query, $dateTimeStamp, $dateTimeStamp + 86400);
                     break;
                 case 'After Package Activated':
+                    $status = StatusAliasGateway::getInstance($this->user)->getPackageStatusIdsFor(USER_STATUS_ACTIVE);
                     $query = "SELECT DISTINCT u.`id` AS customer_id, d.`id` AS package_id "
                             ."FROM `users` u "
                             ."JOIN `domains` d "
@@ -473,7 +478,7 @@ class PluginAutomailer extends ServicePlugin
                             ."JOIN `object_customField` ocf "
                             ."ON d.`id` = ocf.`objectid` "
                             .$excludeJoin
-                            ."WHERE d.`status` IN (".PACKAGE_STATUS_ACTIVE.") "
+                            ."WHERE d.`status` IN (".implode(', ', $status).") "
                             ."AND ocf.`customFieldId` IN ( "
                             ."SELECT cf.`id` "
                             ."FROM `customField` cf "
@@ -486,6 +491,7 @@ class PluginAutomailer extends ServicePlugin
                     $result = $this->db->query($query, $dateTimeStamp, $dateTimeStamp + 86400);
                     break;
                 case 'After Package Canceled':  // Includes Canceled, Suspended, and Expired Packages
+                    $status = StatusAliasGateway::getInstance($this->user)->getPackageStatusIdsFor(array(PACKAGE_STATUS_SUSPENDED, PACKAGE_STATUS_CANCELLED, PACKAGE_STATUS_EXPIRED));
                     $query = "SELECT DISTINCT u.`id` AS customer_id, d.`id` AS package_id "
                             ."FROM `users` u "
                             ."JOIN `domains` d "
@@ -493,7 +499,7 @@ class PluginAutomailer extends ServicePlugin
                             ."JOIN `object_customField` ocf "
                             ."ON d.`id` = ocf.`objectid` "
                             .$excludeJoin
-                            ."WHERE d.`status` IN (".PACKAGE_STATUS_SUSPENDED.", ".PACKAGE_STATUS_CANCELLED.", ".PACKAGE_STATUS_EXPIRED.") "
+                            ."WHERE d.`status` IN (".implode(', ', $status).") "
                             ."AND ocf.`customFieldId` IN ( "
                             ."SELECT cf.`id` "
                             ."FROM `customField` cf "
@@ -506,6 +512,7 @@ class PluginAutomailer extends ServicePlugin
                     break;
                 case 'Before Domain Expires':  // Includes Active and Pending Cancellation Packages
                     // Query based on the custom field "Expiration Date".  The field value is timestamp type.
+                    $status = StatusAliasGateway::getInstance($this->user)->getPackageStatusIdsFor(array(PACKAGE_STATUS_ACTIVE, PACKAGE_STATUS_PENDINGCANCELLATION));
                     $query = "SELECT DISTINCT u.`id` AS customer_id, d.`id` AS package_id "
                             ."FROM `users` u "
                             ."JOIN `domains` d "
@@ -513,7 +520,7 @@ class PluginAutomailer extends ServicePlugin
                             ."JOIN `object_customField` ocf "
                             ."ON d.`id` = ocf.`objectid` "
                             .$excludeJoin
-                            ."WHERE d.`status` IN (".PACKAGE_STATUS_ACTIVE.", ".PACKAGE_STATUS_PENDINGCANCELLATION.") "
+                            ."WHERE d.`status` IN (".implode(', ', $status).") "
                             ."AND d.`Plan` IN ( "
                             ."SELECT pa.`id` "
                             ."FROM `package` pa "
@@ -553,6 +560,7 @@ class PluginAutomailer extends ServicePlugin
                     }
 
                     // Query based on the "nextbilldate" field of the "recurringfee" table.
+                    $status = StatusAliasGateway::getInstance($this->user)->getPackageStatusIdsFor(array(PACKAGE_STATUS_ACTIVE, PACKAGE_STATUS_PENDINGCANCELLATION));
                     $query = "SELECT DISTINCT u.`id` AS customer_id, d.`id` AS package_id "
                             ."FROM `users` u "
                             ."JOIN `domains` d "
@@ -563,7 +571,7 @@ class PluginAutomailer extends ServicePlugin
                             ."AND rf.`recurring` = 1 "
                             ."AND rf.paymentterm != 0 "
                             .$excludeJoin
-                            ."WHERE d.`status` IN (".PACKAGE_STATUS_ACTIVE.", ".PACKAGE_STATUS_PENDINGCANCELLATION.") "
+                            ."WHERE d.`status` IN (".implode(', ', $status).") "
                             ."AND d.`Plan` IN ( "
                             ."SELECT pa.`id` "
                             ."FROM `package` pa "
