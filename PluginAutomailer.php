@@ -470,7 +470,7 @@ class PluginAutomailer extends ServicePlugin
                     $result = $this->db->query($query, $dateTimeStamp, $dateTimeStamp + 86400);
                     break;
                 case 'After Package Activated':
-                    $status = StatusAliasGateway::getInstance($this->user)->getPackageStatusIdsFor(USER_STATUS_ACTIVE);
+                    $status = StatusAliasGateway::getInstance($this->user)->getPackageStatusIdsFor(PACKAGE_STATUS_ACTIVE);
                     $query = "SELECT DISTINCT u.`id` AS customer_id, d.`id` AS package_id "
                             ."FROM `users` u "
                             ."JOIN `domains` d "
