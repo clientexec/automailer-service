@@ -376,21 +376,21 @@ class PluginAutomailer extends ServicePlugin
         $Match = $Rules['match'];
 
         //IGNORE IF CUSTOMER DO NOT WANT EMAILS, UNLESS THE NOTIFICATION SAYS TO SEND TO ALL.
-        $overrideOptOut = isset($Rules['overrideOptOut'])? $Rules['overrideOptOut'] : '1';
+        // $overrideOptOut = isset($Rules['overrideOptOut'])? $Rules['overrideOptOut'] : '1';
         $excludeJoin = '';
         $excludeWhere = '';
-        if(!$overrideOptOut){
-            $query = "SELECT id "
-                    ."FROM customuserfields "
-                    ."WHERE type = ?";
-            $result = $this->db->query($query, TYPE_ALLOW_EMAIL);
-            $row = $result->fetch();
-            
-            $excludeJoin = "JOIN `user_customuserfields` ucufex "
-                          ."ON u.`id` = ucufex.`userid` ";
-            $excludeWhere = "AND ucufex.`customid` = ".$row['id']." "
-                           ."AND ucufex.`value` = 1 ";
-        }
+        // if(!$overrideOptOut){
+        //     $query = "SELECT id "
+        //             ."FROM customuserfields "
+        //             ."WHERE type = ?";
+        //     $result = $this->db->query($query, TYPE_ALLOW_EMAIL);
+        //     $row = $result->fetch();
+
+        //     $excludeJoin = "JOIN `user_customuserfields` ucufex "
+        //                   ."ON u.`id` = ucufex.`userid` ";
+        //     $excludeWhere = "AND ucufex.`customid` = ".$row['id']." "
+        //                    ."AND ucufex.`value` = 1 ";
+        // }
 
         $Rules = $Rules['rules'];
 
@@ -419,6 +419,7 @@ class PluginAutomailer extends ServicePlugin
             }
 
             switch($Rules[0]['fieldname']){
+
                 case 'After Account Pending':
                     $status = StatusAliasGateway::getInstance($this->user)->getUserStatusIdsFor(USER_STATUS_PENDING);
                     $query = "SELECT u.`id` AS customer_id "
@@ -589,30 +590,92 @@ class PluginAutomailer extends ServicePlugin
                     break;
             }
         }else{
+
             $joinFilters = "";
             $whereFiltersArray = array();
             $hasPackage = 0;
             $joinIndex = 0;   // To tag the join tables with different names and avoid issues
             $parameters = array();
+            $jointypes = array();
+            $jointypes['package_custom_field'] = array();
+
+            //We should not be doing joins if same field
+            //we should be doing where blah IN ()
             foreach($Rules as $Rule){
                 if($Rule['fieldtype'] == 'User'){
-                    $whereFiltersArray[] = "( u.`".$Rule['fieldname']."` ".$Rule['operator']." ? ) ";
-                    $parameters[] = $Rule['value'];
+
+                    $jointypes['user_field'][$Rule['fieldname']][] = $Rule;
+
                 }elseif($Rule['fieldtype'] == 'User Custom Field'){
-                    $joinFilters .= " JOIN `user_customuserfields` ucuf".$joinIndex." ON u.`id` = ucuf".$joinIndex.".`userid` ";
-                    $whereFiltersArray[] = "( ucuf".$joinIndex.".`customid` = ".$Rule['fieldname']." AND ucuf".$joinIndex.".`value` ".$Rule['operator']." ? ) ";
-                    $parameters[] = $Rule['value'];
+
+                    $jointypes['user_custom_field'][$Rule['fieldname']][] = $Rule;
+
                 }elseif($Rule['fieldtype'] == 'Package'){
+
+                    $jointypes['package_field'][$Rule['fieldname']][] = $Rule;
                     $hasPackage = 1;
-                    $whereFiltersArray[] = "( d.`".$Rule['fieldname']."` ".$Rule['operator']." ? ) ";
-                    $parameters[] = $Rule['value'];
+
                 }elseif($Rule['fieldtype'] == 'Package Custom Field'){
+
+                    $jointypes['package_custom_field'][$Rule['fieldname']][] = $Rule;
                     $hasPackage = 1;
-                    $joinFilters .= " JOIN `object_customField` ocf".$joinIndex." ON d.`id` = ocf".$joinIndex.".`objectid` ";
-                    $whereFiltersArray[] = "( ocf".$joinIndex.".`customFieldId` = ".$Rule['fieldname']." AND ocf".$joinIndex.".`value` ".$Rule['operator']." ? ) ";
-                    $parameters[] = $Rule['value'];
+
                 }
-                $joinIndex++;
+            }
+
+            //let's look for each type so we can build a better join
+            foreach ($jointypes as $typename => $jointype) {
+
+                switch($typename) {
+                    case "user_field" :
+                        foreach ($jointype as $key => $values) {
+
+                            //let's see if we can merge some joins if we are working with same custom field
+                            foreach ($values as $rule) {
+                                $val = mysql_real_escape_string($rule['value']);
+                                $whereFiltersArray[] = "( u.`".$rule['fieldname']."` ".$rule['operator']." '".$val."' ) ";
+                            }
+
+                        }
+                        break;
+                    case "user_custom_field":
+                        foreach ($jointype as $key => $values) {
+
+                            //let's see if we can merge some joins if we are working with same custom field
+                            $joinFilters .= " JOIN `user_customuserfields` ucuf".$joinIndex." ON u.`id` = ucuf".$joinIndex.".`userid` ";
+                            foreach ($values as $rule) {
+                                $val = mysql_real_escape_string($rule['value']);
+                                $whereFiltersArray[] = "( ucuf".$joinIndex.".`customid` = ".$rule['fieldname']." AND ucuf".$joinIndex.".`value` ".$rule['operator']." '".$val."' ) ";
+                            }
+                            $joinIndex++; // since we are adding a join filter let's raise
+
+                        }
+                        break;
+                    case "package_field":
+                        foreach ($jointype as $key => $values) {
+
+                            //let's see if we can merge some joins if we are working with same custom field
+                            foreach ($values as $rule) {
+                                $val = mysql_real_escape_string($rule['value']);
+                                $whereFiltersArray[] = "( d.`".$rule['fieldname']."` ".$rule['operator']." '".$val."' ) ";
+                            }
+
+                        }
+                        break;
+                    case "package_custom_field":
+                        foreach ($jointype as $key => $values) {
+
+                            //let's see if we can merge some joins if we are working with same custom field
+                            $joinFilters .= " JOIN `object_customField` ocf".$joinIndex." ON d.`id` = ocf".$joinIndex.".`objectid` ";
+                            foreach ($values as $rule) {
+                                $val = mysql_real_escape_string($rule['value']);
+                                $whereFiltersArray[] = "( ocf".$joinIndex.".`customFieldId` = ".$rule['fieldname']." AND ocf".$joinIndex.".`value` ".$rule['operator']." '".$val."' ) ";
+                            }
+                            $joinIndex++; // since we are adding a join filter let's raise
+
+                        }
+                        break;
+                }
             }
 
             $whereFilters = "";
@@ -641,8 +704,11 @@ class PluginAutomailer extends ServicePlugin
                     .$whereFilters
                     .$excludeWhere;
             try{
+
                 $result = $this->db->query($query, $parameters);
+
             }catch(Exception $ex){
+                CE_Lib::debug($ex->getMessage());
                 return false;
             }
         }
@@ -674,6 +740,7 @@ class PluginAutomailer extends ServicePlugin
             return $appliesToArray;
         }
 
+
         $result = $this->getResults($AutomailerRule);
 
         if($result === false){
@@ -701,6 +768,8 @@ class PluginAutomailer extends ServicePlugin
             }
         }
         return $appliesToArray;
+
+       return array();
     }
 }
 ?>
