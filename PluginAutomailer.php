@@ -9,6 +9,8 @@ require_once 'modules/clients/models/UserPackageGateway.php';
 require_once 'modules/admin/models/Package.php';
 include_once 'modules/admin/models/NotificationGateway.php';
 include_once 'modules/admin/models/UserNotificationGateway.php';
+require_once 'modules/billing/models/Invoice.php';
+require_once 'modules/billing/models/Currency.php';
 
 /**
 * @package Plugins
@@ -77,6 +79,7 @@ class PluginAutomailer extends ServicePlugin
         $numCustomers = 0;
         $mailGateway = new NE_MailGateway();
         $UserNotificationGateway = new UserNotificationGateway();
+        $currency = new Currency($this->user);
 
         //delete user notifications older than 1 week.
         //$UserNotificationGateway->user = $this->user;
@@ -109,6 +112,7 @@ class PluginAutomailer extends ServicePlugin
                                                                                     //         'User Custom Field',
                                                                                     //         'Package',
                                                                                     //         'Package Custom Field'
+                                                                                    //         'Invoice'
 
                           'fieldname' => 'System Field Name, or Custom Field ID',   // values by fieldtype:
                                                                                     //     System
@@ -134,6 +138,9 @@ class PluginAutomailer extends ServicePlugin
                                                                                     //
                                                                                     //     Package Custom Field
                                                                                     //         * Package Custom Field id  (`customField`.`id`)
+                                                                                    //
+                                                                                    //     Invoice
+                                                                                    //         * Invoice Field name       (`invoice`.FIELD_NAME)
 
                           'operator'  => '<=',                                      // values: '<', '<=', '>', '>=', '=', '!='
 
@@ -202,7 +209,17 @@ class PluginAutomailer extends ServicePlugin
                         // - For each customer:
                         while($row = $result->fetch()){
                             //ignore if the notification was already sent
-                            if(!$UserNotificationGateway->existUserNotification(((isset($row['package_id']))? 'package' : 'user'), ((isset($row['package_id']))? $row['package_id'] : $row['customer_id']), $AutomailerRule->getId(), $AutomailerRule->isSystem())){
+                            if(isset($row['package_id'])){
+                                $object_type = 'package';
+                                $object_id = $row['package_id'];
+                            }elseif(isset($row['invoice_id'])){
+                                $object_type = 'invoice';
+                                $object_id = $row['invoice_id'];
+                            }else{
+                                $object_type = 'user';
+                                $object_id = $row['customer_id'];
+                            }
+                            if(!$UserNotificationGateway->existUserNotification($object_type, $object_id, $AutomailerRule->getId(), $AutomailerRule->isSystem())){
                                 // * Instantiate the user
                                 $user = new User($row['customer_id']);
 
@@ -210,32 +227,71 @@ class PluginAutomailer extends ServicePlugin
                                 $strEmailArr     = $strEmailArrT;
                                 $strSubjectEmail = $strSubjectEmailT;
 
-                                // * Parse a copy of the email template and the email subject template
+                                // * Get tags values
+                                $userPackage = false;
+                                $package = false;
+                                $additionalEmailTags = array();
                                 if(isset($row['package_id'])){
                                     $userPackage = new UserPackage((int)$row['package_id']);
                                     $package = new Package($userPackage->Plan);
 
-                                    $gateway = new UserPackageGateway($this->user);
+                                    $additionalEmailTags["[PACKAGEGROUPNAME]"] = $package->productGroup->fields['name'];
+                                    $additionalEmailTags["[PACKAGEID]"]        = $row['package_id'];
+                                    $additionalEmailTags["[NEXTDUEDATE]"]      = date($this->settings->get('Date Format'), $dateTimeStamp);
+                                    $additionalEmailTags["[BILLINGEMAIL]"]     = $this->settings->get("Billing E-mail");
+                                }
+                                if(isset($row['invoice_id'])){
+                                    $tInvoiceID = (int)$row['invoice_id'];
+                                    $tempInvoice = new Invoice($tInvoiceID);
 
-                                    $strSubjectEmail = $gateway->_replaceTags1($strSubjectEmail,$user,$package);
-                                    $strEmailArr = $gateway->_replaceTags1($strEmailArr, $user, $package);
+                                    $tempDescription = "";
+                                    foreach ($tempInvoice->getInvoiceEntries() as $tempInvoiceEntry) {
+                                        $tempDescription .="\n" . $tempInvoiceEntry->getDescription();
+                                        $daterangearray = unserialize($this->settings->get('Invoice Entry Date Range Format'));
+                                        if ($tempInvoiceEntry->getPeriodStart() && $daterangearray[0] != '') {
+                                            $tempDescription .= ' (' . CE_Lib::formatDateWithPHPFormat($tempInvoiceEntry->getPeriodStart(), $daterangearray[0]);
+                                            if($tempInvoiceEntry->getPeriodEnd() && $daterangearray[1] != ''){
+                                                $tempDescription .= ' - ';
+                                                $tempDescription .=  CE_Lib::formatDateWithPHPFormat($tempInvoiceEntry->getPeriodEnd(), $daterangearray[1]);
+                                            }
+                                            $tempDescription .=  ')';
+                                        }
+                                        $tempDescription .= " " . $currency->format($user->getCurrency(), $tempInvoiceEntry->getPrice(), true, 'NONE', $user->isHTMLMails() ? true : false, true, true);
+                                    }
 
+                                    if ($tempInvoice->getSentDate() == ""){
+                                        $sentdate = date($this->settings->get('Date Format'), mktime(0, 0, 0, date("m"), date("d"), date("Y")));
+                                    }else{
+                                        $sentdate = date($this->settings->get('Date Format'), $tempInvoice->getSentDate("timestamp"));
+                                    }
+
+                                    $tempTax = $tempInvoice->getTaxCharged();
+
+                                    $amountExTax = $tempInvoice->getPrice() - $tempTax;
+
+                                    $additionalEmailTags["[SENTDATE]"]           = $sentdate;
+                                    $additionalEmailTags["[DATE]"]               = date($this->settings->get('Date Format'), $tempInvoice->getDate("timestamp"));
+                                    $additionalEmailTags["[AMOUNT]"]             = $currency->format($user->getCurrency(), $tempInvoice->getPrice(), true, 'NONE', $user->isHTMLMails() ? true : false, true, true);
+                                    $additionalEmailTags["[PAID]"]               = $currency->format($user->getCurrency(), $tempInvoice->getPrice() - $tempInvoice->getBalanceDue(), true, 'NONE', $user->isHTMLMails() ? true : false, true, true);
+                                    $additionalEmailTags["[BALANCEDUE]"]         = $currency->format($user->getCurrency(), $tempInvoice->getBalanceDue(), true, 'NONE', $user->isHTMLMails() ? true : false, true, true);
+                                    $additionalEmailTags["[RAW_AMOUNT]"]         = $currency->format($user->getCurrency(), $tempInvoice->getPrice());
+                                    $additionalEmailTags["[TAX]"]                = $currency->format($user->getCurrency(), $tempTax, true, 'NONE', $user->isHTMLMails() ? true : false, true, true);
+                                    $additionalEmailTags["[AMOUNT_EX_TAX]"]      = $currency->format($user->getCurrency(), $amountExTax, true, 'NONE', $user->isHTMLMails() ? true : false, true, true);
+                                    $additionalEmailTags["[INVOICENUMBER]"]      = $tInvoiceID;
+                                    $additionalEmailTags["[SUBSCRIPTION_ID]"]    = $tempInvoice->getSubscriptionID();
+                                    $additionalEmailTags["[INVOICEDESCRIPTION]"] = $user->isHTMLMails() ? nl2br($tempDescription) : $tempDescription;
+                                }
+
+                                // * Parse a copy of the email template and the email subject template
+                                $gateway = new UserPackageGateway($this->user);
+                                $strSubjectEmail = $gateway->_replaceTags1($strSubjectEmail,$user, $package);
+                                $strEmailArr = $gateway->_replaceTags1($strEmailArr, $user, $package);
+                                if($userPackage){
                                     $gateway->_replaceTagsByType($userPackage,$user,$strEmailArr, $strSubjectEmail);
-
-
-                                    $additionalEmailTags = array(
-                                        "[PACKAGEGROUPNAME]" => $package->productGroup->fields['name'],
-                                        "[PACKAGEID]"        => $row['package_id'],
-                                        "[NEXTDUEDATE]"      => date($this->settings->get('Date Format'), $dateTimeStamp),
-                                        "[BILLINGEMAIL]"     => $this->settings->get("Billing E-mail")
-                                    );
+                                }
+                                if(count($additionalEmailTags)){
                                     $strSubjectEmail = str_replace(array_keys($additionalEmailTags), $additionalEmailTags, $strSubjectEmail);
                                     $strEmailArr = str_replace(array_keys($additionalEmailTags), $additionalEmailTags, $strEmailArr);
-                                }else{
-                                    $gateway = new UserPackageGateway($this->user);
-
-                                    $strSubjectEmail = $gateway->_replaceTags1($strSubjectEmail,$user);
-                                    $strEmailArr = $gateway->_replaceTags1($strEmailArr, $user);
                                 }
 
                                 // * Send a parsed copy of the email template to the customer
@@ -262,15 +318,15 @@ class PluginAutomailer extends ServicePlugin
 
                                     //track the notification by adding it to the user_notifications table
                                     $userNotification = new UserNotification();
-                                    $userNotification->setObjectType(((isset($row['package_id']))? 'package' : 'user'));
-                                    $userNotification->setObjectID(((isset($row['package_id']))? $row['package_id'] : $row['customer_id']));
+                                    $userNotification->setObjectType($object_type);
+                                    $userNotification->setObjectID($object_id);
                                     $userNotification->setRuleID($AutomailerRule->getId());
                                     $userNotification->setDate(date("Y-m-d H:i:s"));
                                     $userNotification->save();
                                 }
 
                                 // * Add Customer to summary
-                                $summaryNames[$AutomailerRule->getName()][] = $user->getFullName().((isset($row['package_id']))? ', package: '.$row['package_id'] : '');
+                                $summaryNames[$AutomailerRule->getName()][] = $user->getFullName().((isset($row['package_id']))? ', package: '.$row['package_id'] : '').((isset($row['invoice_id']))? ', invoice: '.$row['invoice_id'] : '');
                                 $numCustomers++;
                             }
                         }
@@ -594,6 +650,7 @@ class PluginAutomailer extends ServicePlugin
             $joinFilters = "";
             $whereFiltersArray = array();
             $hasPackage = 0;
+            $hasInvoice = 0;
             $joinIndex = 0;   // To tag the join tables with different names and avoid issues
             $parameters = array();
             $jointypes = array();
@@ -619,6 +676,11 @@ class PluginAutomailer extends ServicePlugin
 
                     $jointypes['package_custom_field'][$Rule['fieldname']][] = $Rule;
                     $hasPackage = 1;
+
+                }elseif($Rule['fieldtype'] == 'Invoice'){
+
+                    $jointypes['invoice_field'][$Rule['fieldname']][] = $Rule;
+                    $hasInvoice = 1;
 
                 }
             }
@@ -675,6 +737,17 @@ class PluginAutomailer extends ServicePlugin
 
                         }
                         break;
+                    case "invoice_field":
+                        foreach ($jointype as $key => $values) {
+
+                            //let's see if we can merge some joins if we are working with same custom field
+                            foreach ($values as $rule) {
+                                $val = mysql_real_escape_string($rule['value']);
+                                $whereFiltersArray[] = "( i.`".$rule['fieldname']."` ".$rule['operator']." '".$val."' ) ";
+                            }
+
+                        }
+                        break;
                 }
             }
 
@@ -694,10 +767,19 @@ class PluginAutomailer extends ServicePlugin
                 $joinDomains = " JOIN `domains` d ON u.`id` = d.`CustomerID` ";
             }
 
+            $selectInvoiceID = "";
+            $joinInvoice = "";
+            if($hasInvoice){
+                $selectInvoiceID = " , i.`id` AS invoice_id ";
+                $joinInvoice = " JOIN `invoice` i ON u.`id` = i.`customerid` ";
+            }
+
             $query = "SELECT DISTINCT u.`id` AS customer_id "
                     .$selectPackageID
+                    .$selectInvoiceID
                     ." FROM `users` u "
                     .$joinDomains
+                    .$joinInvoice
                     .$joinFilters
                     .$excludeJoin
                     ." WHERE u.`groupid` = 1 "
@@ -721,11 +803,13 @@ class PluginAutomailer extends ServicePlugin
         $appliesToArray = array(
             'apply'  => array(
                 'users'    => array(),
-                'packages' => array()
+                'packages' => array(),
+                'invoices' => array()
             ),
             'ignore' => array(
                 'users'    => array(),
-                'packages' => array()
+                'packages' => array(),
+                'invoices' => array()
             )
         );
         $UserNotificationGateway = new UserNotificationGateway();
@@ -752,15 +836,29 @@ class PluginAutomailer extends ServicePlugin
             // - For each customer:
             while($row = $result->fetch()){
                 //ignore if the notification was already sent
-                if(!$UserNotificationGateway->existUserNotification(((isset($row['package_id']))? 'package' : 'user'), ((isset($row['package_id']))? $row['package_id'] : $row['customer_id']), $AutomailerRule->getId(), $AutomailerRule->isSystem())){
+                if(isset($row['package_id'])){
+                    $object_type = 'package';
+                    $object_id = $row['package_id'];
+                }elseif(isset($row['invoice_id'])){
+                    $object_type = 'invoice';
+                    $object_id = $row['invoice_id'];
+                }else{
+                    $object_type = 'user';
+                    $object_id = $row['customer_id'];
+                }
+                if(!$UserNotificationGateway->existUserNotification($object_type, $object_id, $AutomailerRule->getId(), $AutomailerRule->isSystem())){
                     if(isset($row['package_id'])){
                         $appliesToArray['apply']['packages'][] = $row['package_id'];
+                    }elseif(isset($row['invoice_id'])){
+                        $appliesToArray['apply']['invoices'][] = $row['invoice_id'];
                     }else{
                         $appliesToArray['apply']['users'][] = $row['customer_id'];
                     }
                 }else{
                     if(isset($row['package_id'])){
                         $appliesToArray['ignore']['packages'][] = $row['package_id'];
+                    }elseif(isset($row['invoice_id'])){
+                        $appliesToArray['ignore']['invoices'][] = $row['invoice_id'];
                     }else{
                         $appliesToArray['ignore']['users'][] = $row['customer_id'];
                     }
