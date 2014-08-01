@@ -646,6 +646,7 @@ class PluginAutomailer extends ServicePlugin
                     break;
             }
         }else{
+            $gateway = new NotificationGateway();
 
             $joinFilters = "";
             $whereFiltersArray = array();
@@ -694,8 +695,15 @@ class PluginAutomailer extends ServicePlugin
 
                             //let's see if we can merge some joins if we are working with same custom field
                             foreach ($values as $rule) {
-                                $val = mysql_real_escape_string($rule['value']);
-                                $whereFiltersArray[] = "( u.`".$rule['fieldname']."` ".$rule['operator']." '".$val."' ) ";
+                                if ($this->isDateRule($gateway->getRuleFields('user'), $rule)) {
+                                    $whereFiltersArray[] = $this->completeConditions(
+                                        $rule,
+                                        "u.`".$rule['fieldname']."`"
+                                    );
+                                } else {
+                                    $val = mysql_real_escape_string($rule['value']);
+                                    $whereFiltersArray[] = "( u.`".$rule['fieldname']."` ".$rule['operator']." '".$val."' ) ";
+                                }
                             }
 
                         }
@@ -706,8 +714,16 @@ class PluginAutomailer extends ServicePlugin
                             //let's see if we can merge some joins if we are working with same custom field
                             $joinFilters .= " JOIN `user_customuserfields` ucuf".$joinIndex." ON u.`id` = ucuf".$joinIndex.".`userid` ";
                             foreach ($values as $rule) {
-                                $val = mysql_real_escape_string($rule['value']);
-                                $whereFiltersArray[] = "( ucuf".$joinIndex.".`customid` = ".$rule['fieldname']." AND ucuf".$joinIndex.".`value` ".$rule['operator']." '".$val."' ) ";
+                                if ($this->isDateRule($gateway->getRuleFields('user'), $rule)) {
+                                    $whereFiltersArray[] = $this->completeConditions(
+                                        $rule,
+                                        "ucuf".$joinIndex.".`value`",
+                                        array("ucuf$joinIndex.`customid` = ".$rule['fieldname'])
+                                    );
+                                } else {
+                                    $val = mysql_real_escape_string($rule['value']);
+                                    $whereFiltersArray[] = "( ucuf".$joinIndex.".`customid` = ".$rule['fieldname']." AND ucuf".$joinIndex.".`value` ".$rule['operator']." '".$val."' ) ";
+                                }
                             }
                             $joinIndex++; // since we are adding a join filter let's raise
 
@@ -718,8 +734,15 @@ class PluginAutomailer extends ServicePlugin
 
                             //let's see if we can merge some joins if we are working with same custom field
                             foreach ($values as $rule) {
-                                $val = mysql_real_escape_string($rule['value']);
-                                $whereFiltersArray[] = "( d.`".$rule['fieldname']."` ".$rule['operator']." '".$val."' ) ";
+                                if ($this->isDateRule($gateway->getRuleFields('package'), $rule)) {
+                                    $whereFiltersArray[] = $this->completeConditions(
+                                        $rule,
+                                        "d.`".$rule['fieldname']."`"
+                                    );
+                                } else {
+                                    $val = mysql_real_escape_string($rule['value']);
+                                    $whereFiltersArray[] = "( d.`".$rule['fieldname']."` ".$rule['operator']." '".$val."' ) ";
+                                }
                             }
 
                         }
@@ -730,8 +753,16 @@ class PluginAutomailer extends ServicePlugin
                             //let's see if we can merge some joins if we are working with same custom field
                             $joinFilters .= " JOIN `object_customField` ocf".$joinIndex." ON d.`id` = ocf".$joinIndex.".`objectid` ";
                             foreach ($values as $rule) {
-                                $val = mysql_real_escape_string($rule['value']);
-                                $whereFiltersArray[] = "( ocf".$joinIndex.".`customFieldId` = ".$rule['fieldname']." AND ocf".$joinIndex.".`value` ".$rule['operator']." '".$val."' ) ";
+                                if ($this->isDateRule($gateway->getRuleFields('package'), $rule)) {
+                                    $whereFiltersArray[] = $this->completeConditions(
+                                        $rule,
+                                        "ocf$joinIndex.value",
+                                        array("ocf$joinIndex.`customFieldId` = ".$rule['fieldname'])
+                                    );
+                                } else {
+                                    $val = mysql_real_escape_string($rule['value']);
+                                    $whereFiltersArray[] = "( ocf".$joinIndex.".`customFieldId` = ".$rule['fieldname']." AND ocf".$joinIndex.".`value` ".$rule['operator']." '".$val."' ) ";
+                                }
                             }
                             $joinIndex++; // since we are adding a join filter let's raise
 
@@ -742,8 +773,15 @@ class PluginAutomailer extends ServicePlugin
 
                             //let's see if we can merge some joins if we are working with same custom field
                             foreach ($values as $rule) {
-                                $val = mysql_real_escape_string($rule['value']);
-                                $whereFiltersArray[] = "( i.`".$rule['fieldname']."` ".$rule['operator']." '".$val."' ) ";
+                                if ($this->isDateRule($gateway->getRuleFields('invoice'), $rule)) {
+                                    $whereFiltersArray[] = $this->completeConditions(
+                                        $rule,
+                                        "i.`{$rule['fieldname']}`"
+                                    );
+                                } else {
+                                    $value = mysql_real_escape_string($rule['value']);
+                                    $whereFiltersArray[] = "( i.`".$rule['fieldname']."` ".$rule['operator']." '".$value."' ) ";
+                                }
                             }
 
                         }
@@ -785,6 +823,7 @@ class PluginAutomailer extends ServicePlugin
                     ." WHERE u.`groupid` = 1 "
                     .$whereFilters
                     .$excludeWhere;
+            CE_Lib::log(7, "Automailer SQL: $query");
             try{
 
                 $result = $this->db->query($query, $parameters);
@@ -868,6 +907,71 @@ class PluginAutomailer extends ServicePlugin
         return $appliesToArray;
 
        return array();
+    }
+
+    private function isDateRule($fields, $rule)
+    {
+        $isDate = false;
+        foreach ($fields as $key => $val) {
+            if (strpos($key, $rule['fieldname']) !== false) {
+                $isDate = $val[1] && isset($rule['operator_dates']) && isset($rule['operator_dates_units']);
+                break;
+            }
+        }
+        return $isDate;
+    }
+
+    private function completeConditions($rule, $field, $conditions = array())
+    {
+        $value = (float) $rule['value'];
+        switch ($rule['operator_dates_units']) {
+            case Notification::DATE_UNIT_HOURS:
+                $value = $value * 60 * 60;
+                $valueDec = $value - 60 * 60;
+                $valueInc = $value + 60 * 60;
+                break;
+            case Notification::DATE_UNIT_DAYS:
+                $value = $value * 60 * 60 * 24;
+                $valueDec = $value - 60 * 60 * 24;
+                $valueInc = $value + 60 * 60 * 24;
+                break;
+            case Notification::DATE_UNIT_WEEKS:
+                $value = $value * 60 * 60 * 24 * 7;
+                $valueDec = $value - 60 * 60 * 24 * 7;
+                $valueInc = $value + 60 * 60 * 24 * 7;
+                break;
+            case Notification::DATE_UNIT_MONTHS:
+                $value = $value * 60 * 60 * 24 *  30;
+                $valueDec = $value - 60 * 60 * 24 * 30;
+                $valueInc = $value + 60 * 60 * 24 * 30;
+                break;
+        }
+
+        $now = date('Y-m-d H:i:s');
+
+        // DATE_FORMAT() below is used to normalize date-only fields to date-time
+        switch ($rule['operator_dates']) {
+            case Notification::DATE_OPERATOR_WAS_EXACTLY:
+                $conditions[] = "TIME_TO_SEC(TIMEDIFF('$now', DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'))) > $valueDec";
+                $conditions[] = "TIME_TO_SEC(TIMEDIFF('$now', DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'))) <= $value";
+                break;
+            case Notification::DATE_OPERATOR_WAS_LESS_THAN:
+                $conditions[] = "TIME_TO_SEC(TIMEDIFF('$now', DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'))) > 0";
+                $conditions[] = "TIME_TO_SEC(TIMEDIFF('$now', DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'))) < $value";
+                break;
+            case Notification::DATE_OPERATOR_WAS_MORE_THAN:
+                $conditions[] = "TIME_TO_SEC(TIMEDIFF('$now', DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'))) > $value";
+                break;
+            case Notification::DATE_OPERATOR_WILL_OCCUR_IN:
+                $conditions[] = "TIME_TO_SEC(TIMEDIFF(DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'), '$now')) > $value";
+                $conditions[] = "TIME_TO_SEC(TIMEDIFF(DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'), '$now')) <= $valueInc";
+                break;
+            case Notification::DATE_OPERATOR_WILL_OCCUR_WITHIN:
+                $conditions[] = "TIME_TO_SEC(TIMEDIFF(DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'), '$now')) > 0";
+                $conditions[] = "TIME_TO_SEC(TIMEDIFF(DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'), '$now')) < $value";
+                break;
+        }
+        return '('.implode(' AND ', $conditions).') ';
     }
 }
 ?>
