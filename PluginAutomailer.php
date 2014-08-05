@@ -778,6 +778,26 @@ class PluginAutomailer extends ServicePlugin
                                         $rule,
                                         "i.`{$rule['fieldname']}`"
                                     );
+                                } elseif ($rule['fieldname'] == 'status') {
+                                    switch ($rule['value']) {
+                                        case Notification::INVOICE_STATUS_NOT_PAID_PROCESSED:
+                                            $joinFilters .= " LEFT JOIN invoicetransaction it".$joinIndex." ON i.id = it".$joinIndex.".invoiceid ";
+                                            $whereFiltersArray[] = "( i.status IN(".INVOICE_STATUS_UNPAID.", ".INVOICE_STATUS_PARTIALLY_PAID.") AND it$joinIndex.id IS NOT NULL) ";
+                                            $joinIndex++;
+                                            break;
+                                        case Notification::INVOICE_STATUS_NOT_PAID:
+                                            $whereFiltersArray[] = "( i.status IN(".INVOICE_STATUS_UNPAID.", ".INVOICE_STATUS_PARTIALLY_PAID.")) ";
+                                            break;
+                                        case INVOICE_STATUS_PAID:
+                                        case INVOICE_STATUS_VOID:
+                                        case INVOICE_STATUS_REFUNDED:
+                                        case INVOICE_STATUS_PENDING:
+                                        case INVOICE_STATUS_CREDITED:
+                                            $whereFiltersArray[] = "( i.status=" . $rule['value'] . ') ';
+                                            break;
+                                        default:
+                                            throw new Exception('Invalid invoice status');
+                                    }
                                 } else {
                                     $value = mysql_real_escape_string($rule['value']);
                                     $whereFiltersArray[] = "( i.`".$rule['fieldname']."` ".$rule['operator']." '".$value."' ) ";
