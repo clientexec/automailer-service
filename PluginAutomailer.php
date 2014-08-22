@@ -864,13 +864,14 @@ class PluginAutomailer extends ServicePlugin
                 'users'    => array(),
                 'packages' => array(),
                 'invoices' => array()
-            ),
-            'ignore' => array(
-                'users'    => array(),
-                'packages' => array(),
-                'invoices' => array()
             )
         );
+        // ,
+        //     'ignore' => array(
+        //         'users'    => array(),
+        //         'packages' => array(),
+        //         'invoices' => array()
+        //     )
         $UserNotificationGateway = new UserNotificationGateway();
 
         $Rules = $AutomailerRule->getRules();
@@ -914,13 +915,14 @@ class PluginAutomailer extends ServicePlugin
                         $appliesToArray['apply']['users'][] = $row['customer_id'];
                     }
                 }else{
-                    if(isset($row['package_id'])){
-                        $appliesToArray['ignore']['packages'][] = $row['package_id'];
-                    }elseif(isset($row['invoice_id'])){
-                        $appliesToArray['ignore']['invoices'][] = $row['invoice_id'];
-                    }else{
-                        $appliesToArray['ignore']['users'][] = $row['customer_id'];
-                    }
+                    //we don't need to track ignore any longer
+                    // if(isset($row['package_id'])){
+                    //     $appliesToArray['ignore']['packages'][] = $row['package_id'];
+                    // }elseif(isset($row['invoice_id'])){
+                    //     $appliesToArray['ignore']['invoices'][] = $row['invoice_id'];
+                    // }else{
+                    //     $appliesToArray['ignore']['users'][] = $row['customer_id'];
+                    // }
                 }
             }
         }
