@@ -701,7 +701,7 @@ class PluginAutomailer extends ServicePlugin
                                         "u.`".$rule['fieldname']."`"
                                     );
                                 } else {
-                                    $val = mysql_real_escape_string($rule['value']);
+                                    $val = $this->db->escape_string($rule['value']);
                                     $whereFiltersArray[] = "( u.`".$rule['fieldname']."` ".$rule['operator']." '".$val."' ) ";
                                 }
                             }
@@ -721,7 +721,7 @@ class PluginAutomailer extends ServicePlugin
                                         array("ucuf$joinIndex.`customid` = ".$rule['fieldname'])
                                     );
                                 } else {
-                                    $val = mysql_real_escape_string($rule['value']);
+                                    $val = $this->db->escape_string($rule['value']);
                                     $whereFiltersArray[] = "( ucuf".$joinIndex.".`customid` = ".$rule['fieldname']." AND ucuf".$joinIndex.".`value` ".$rule['operator']." '".$val."' ) ";
                                 }
                             }
@@ -740,7 +740,7 @@ class PluginAutomailer extends ServicePlugin
                                         "d.`".$rule['fieldname']."`"
                                     );
                                 } else {
-                                    $val = mysql_real_escape_string($rule['value']);
+                                    $val = $this->db->escape_string($rule['value']);
                                     $whereFiltersArray[] = "( d.`".$rule['fieldname']."` ".$rule['operator']." '".$val."' ) ";
                                 }
                             }
@@ -760,7 +760,7 @@ class PluginAutomailer extends ServicePlugin
                                         array("ocf$joinIndex.`customFieldId` = ".$rule['fieldname'])
                                     );
                                 } else {
-                                    $val = mysql_real_escape_string($rule['value']);
+                                    $val = $this->db->escape_string($rule['value']);
                                     $whereFiltersArray[] = "( ocf".$joinIndex.".`customFieldId` = ".$rule['fieldname']." AND ocf".$joinIndex.".`value` ".$rule['operator']." '".$val."' ) ";
                                 }
                             }
@@ -799,7 +799,7 @@ class PluginAutomailer extends ServicePlugin
                                             throw new Exception('Invalid invoice status');
                                     }
                                 } else {
-                                    $value = mysql_real_escape_string($rule['value']);
+                                    $value = $this->db->escape_string($rule['value']);
                                     $whereFiltersArray[] = "( i.`".$rule['fieldname']."` ".$rule['operator']." '".$value."' ) ";
                                 }
                             }
