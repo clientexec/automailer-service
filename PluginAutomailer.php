@@ -233,11 +233,12 @@ class PluginAutomailer extends ServicePlugin
                                 $additionalEmailTags = array();
                                 if(isset($row['package_id'])){
                                     $userPackage = new UserPackage((int)$row['package_id']);
+                                    $recurringFee = $userPackage->getRecurringFeeEntry();
                                     $package = new Package($userPackage->Plan);
 
                                     $additionalEmailTags["[PACKAGEGROUPNAME]"] = $package->productGroup->fields['name'];
                                     $additionalEmailTags["[PACKAGEID]"]        = $row['package_id'];
-                                    $additionalEmailTags["[NEXTDUEDATE]"]      = date($this->settings->get('Date Format'), $dateTimeStamp);
+                                    $additionalEmailTags["[NEXTDUEDATE]"]      = $recurringFee->getNextBillDate();
                                     $additionalEmailTags["[BILLINGEMAIL]"]     = $this->settings->get("Billing E-mail");
                                 }
                                 if(isset($row['invoice_id'])){
