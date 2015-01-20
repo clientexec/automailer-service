@@ -11,6 +11,7 @@ include_once 'modules/admin/models/NotificationGateway.php';
 include_once 'modules/admin/models/UserNotificationGateway.php';
 require_once 'modules/billing/models/Invoice.php';
 require_once 'modules/billing/models/Currency.php';
+require_once 'modules/clients/models/UserPackage.php';
 
 /**
 * @package Plugins
@@ -257,7 +258,21 @@ class PluginAutomailer extends ServicePlugin
 
                                     $tempDescription = "";
                                     foreach ($tempInvoice->getInvoiceEntries() as $tempInvoiceEntry) {
-                                        $tempDescription .="\n" . $tempInvoiceEntry->getDescription();
+
+                                        $packageID = "";
+                                        $tempEntryDescription = $tempInvoiceEntry->getDescription();
+                                        //get full identifier
+                                        if ($tempInvoiceEntry->AppliesTo() > 0) {
+                                            $tempUserPackage = new UserPackage($tempInvoiceEntry->AppliesTo());
+                                            if ($tempUserPackage->existsInDB()) {
+                                                $packageID = $tempUserPackage->getReference(true, true, $tempEntryDescription);
+                                            }
+                                            $invoice_label = $packageID.(($packageID != '')? ' - ':'').$tempEntryDescription;
+                                        } else {
+                                            $invoice_label = $tempEntryDescription;
+                                        }
+
+                                        $tempDescription .="\n" . $invoice_label;
                                         $daterangearray = unserialize($this->settings->get('Invoice Entry Date Range Format'));
                                         if ($tempInvoiceEntry->getPeriodStart() && $daterangearray[0] != '') {
                                             $tempDescription .= ' (' . CE_Lib::formatDateWithPHPFormat($tempInvoiceEntry->getPeriodStart(), $daterangearray[0]);
