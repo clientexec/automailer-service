@@ -255,43 +255,14 @@ class PluginAutomailer extends ServicePlugin
                                         if ($tempInvoiceEntry->AppliesTo() > 0) {
                                             $tempUserPackage = new UserPackage($tempInvoiceEntry->AppliesTo());
                                             if ($tempUserPackage->existsInDB()) {
-                                                if(count($languages) > 1){
-                                                    $planname = $tempUserPackage->getProductName();
-                                                    $plannameLanguage = $translations->getValue(PRODUCT_NAME, $tempUserPackage->packageGroupInfo['productid'], $languageKey, $planname);
-                                                    $productGroupName = $tempUserPackage->getProductGroupName();
-                                                    $productGroupNameLanguage = $translations->getValue(PRODUCT_GROUP_NAME, $tempUserPackage->packageGroupInfo['productgroupid'], $languageKey, $productGroupName);
-
-                                                    //Replace product name from default language to customer language
-                                                    $tempEntryDescription = str_replace($planname, $plannameLanguage, $tempEntryDescription);
-
-                                                    //Replace product group name from default language to customer language
-                                                    $tempEntryDescription = str_replace($productGroupName, $productGroupNameLanguage, $tempEntryDescription);
-
-                                                    $packageID = $tempUserPackage->getReference(true, true, $tempEntryDescription, $languageKey);
-                                                }else{
-                                                    $packageID = $tempUserPackage->getReference(true, true, $tempEntryDescription);
-                                                }
+                                                $packageID = $tempUserPackage->getReference(true, true, $tempEntryDescription);
                                             }
                                             $invoice_label = $packageID.(($packageID != '')? ' - ':'').$tempEntryDescription;
                                         } else {
                                             $invoice_label = $tempEntryDescription;
                                         }
 
-                                        if(count($languages) > 1 && $tempInvoiceEntry->AppliesTo() > 0 && $tempUserPackage->existsInDB()){
-                                            $planname = $tempUserPackage->getProductName();
-                                            $plannameLanguage = $translations->getValue(PRODUCT_NAME, $tempUserPackage->packageGroupInfo['productid'], $languageKey, $planname);
-                                            $productGroupName = $tempUserPackage->getProductGroupName();
-                                            $productGroupNameLanguage = $translations->getValue(PRODUCT_GROUP_NAME, $tempUserPackage->packageGroupInfo['productgroupid'], $languageKey, $productGroupName);
-
-                                            //Replace product name from default language to customer language
-                                            $invoice_label = str_replace($planname, $plannameLanguage, $invoice_label);
-
-                                            //Replace product group name from default language to customer language
-                                            $invoice_label = str_replace($productGroupName, $productGroupNameLanguage, $invoice_label);
-                                        }
-
                                         $tempDescription .="\n" . $invoice_label;
-
                                         $daterangearray = unserialize($this->settings->get('Invoice Entry Date Range Format'));
                                         if ($tempInvoiceEntry->getPeriodStart() && $daterangearray[0] != '') {
                                             $tempDescription .= ' (' . CE_Lib::formatDateWithPHPFormat($tempInvoiceEntry->getPeriodStart(), $daterangearray[0]);
