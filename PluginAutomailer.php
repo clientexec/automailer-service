@@ -237,17 +237,7 @@ class PluginAutomailer extends ServicePlugin
                                     $recurringFee = $userPackage->getRecurringFeeEntry();
                                     $package = new Package($userPackage->Plan);
 
-                                    $languages = CE_Lib::getEnabledLanguages();
-                                    include_once 'modules/admin/models/Translations.php';
-                                    $translations = new Translations();
-                                    $languageKey = ucfirst(strtolower($user->getRealLanguage()));
-
-                                    if(count($languages) > 1){
-                                        $additionalEmailTags["[PACKAGEGROUPNAME]"] = $translations->getValue(PRODUCT_GROUP_NAME, $package->productGroup->getId(), $languageKey, $package->productGroup->fields['name']);
-                                    }else{
-                                        $additionalEmailTags["[PACKAGEGROUPNAME]"] = $package->productGroup->fields['name'];
-                                    }
-
+                                    $additionalEmailTags["[PACKAGEGROUPNAME]"] = $package->productGroup->fields['name'];
                                     $additionalEmailTags["[PACKAGEID]"]        = $row['package_id'];
                                     $additionalEmailTags["[NEXTDUEDATE]"]      = $recurringFee->getNextBillDate();
                                     $additionalEmailTags["[BILLINGEMAIL]"]     = $this->settings->get("Billing E-mail");
