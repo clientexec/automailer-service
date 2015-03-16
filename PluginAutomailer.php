@@ -168,6 +168,10 @@ class PluginAutomailer extends ServicePlugin
         $gateway = new NotificationGateway();
         $AutomailerRules = $gateway->getNotifications();
 
+        include_once 'modules/admin/models/Translations.php';
+        $languages = CE_Lib::getEnabledLanguages();
+        $translations = new Translations();
+
         //Get the customers for each case:
         while ($AutomailerRule = $AutomailerRules->fetch()) {
             if($AutomailerRule->getEnabled() == 1){
@@ -205,6 +209,8 @@ class PluginAutomailer extends ServicePlugin
                     }else{
                         $strEmailArrT = $template->getContents();
                         $strSubjectEmailT = $template->getSubject();
+                        $templateID = $template->getId();
+
                         $strNameEmailT = $template->getName();
 
                         // - For each customer:
@@ -227,6 +233,14 @@ class PluginAutomailer extends ServicePlugin
                                 // * Create a copy of the email template
                                 $strEmailArr     = $strEmailArrT;
                                 $strSubjectEmail = $strSubjectEmailT;
+                                if($templateID !== false){
+                                    $languageKey = ucfirst(strtolower($user->getRealLanguage()));
+
+                                    if(count($languages) > 1){
+                                        $strSubjectEmail = $translations->getValue(EMAIL_SUBJECT, $templateID, $languageKey, $strSubjectEmail);
+                                        $strEmailArr = $translations->getValue(EMAIL_CONTENT, $templateID, $languageKey, $strEmailArr);
+                                    }
+                                }
 
                                 // * Get tags values
                                 $userPackage = false;
