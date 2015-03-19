@@ -172,6 +172,9 @@ class PluginAutomailer extends ServicePlugin
         $languages = CE_Lib::getEnabledLanguages();
         $translations = new Translations();
 
+        require_once 'modules/billing/models/InvoiceEntriesGateway.php';
+        $InvoiceEntriesGateway = new InvoiceEntriesGateway($this->user);
+
         //Get the customers for each case:
         while ($AutomailerRule = $AutomailerRules->fetch()) {
             if($AutomailerRule->getEnabled() == 1){
@@ -229,12 +232,12 @@ class PluginAutomailer extends ServicePlugin
                             if(!$UserNotificationGateway->existUserNotification($object_type, $object_id, $AutomailerRule->getId(), $AutomailerRule->isSystem())){
                                 // * Instantiate the user
                                 $user = new User($row['customer_id']);
+                                $languageKey = ucfirst(strtolower($user->getRealLanguage()));
 
                                 // * Create a copy of the email template
                                 $strEmailArr     = $strEmailArrT;
                                 $strSubjectEmail = $strSubjectEmailT;
                                 if($templateID !== false){
-                                    $languageKey = ucfirst(strtolower($user->getRealLanguage()));
 
                                     if(count($languages) > 1){
                                         $strSubjectEmail = $translations->getValue(EMAIL_SUBJECT, $templateID, $languageKey, $strSubjectEmail);
@@ -250,11 +253,6 @@ class PluginAutomailer extends ServicePlugin
                                     $userPackage = new UserPackage((int)$row['package_id']);
                                     $recurringFee = $userPackage->getRecurringFeeEntry();
                                     $package = new Package($userPackage->Plan);
-
-                                    $languages = CE_Lib::getEnabledLanguages();
-                                    include_once 'modules/admin/models/Translations.php';
-                                    $translations = new Translations();
-                                    $languageKey = ucfirst(strtolower($user->getRealLanguage()));
 
                                     if(count($languages) > 1){
                                         $additionalEmailTags["[PACKAGEGROUPNAME]"] = $translations->getValue(PRODUCT_GROUP_NAME, $package->productGroup->getId(), $languageKey, $package->productGroup->fields['name']);
@@ -272,48 +270,7 @@ class PluginAutomailer extends ServicePlugin
 
                                     $tempDescription = "";
                                     foreach ($tempInvoice->getInvoiceEntries() as $tempInvoiceEntry) {
-
-                                        $packageID = "";
-                                        $tempEntryDescription = $tempInvoiceEntry->getDescription();
-                                        //get full identifier
-                                        if ($tempInvoiceEntry->AppliesTo() > 0) {
-                                            $tempUserPackage = new UserPackage($tempInvoiceEntry->AppliesTo());
-                                            if ($tempUserPackage->existsInDB()) {
-                                                if(count($languages) > 1){
-                                                    $planname = $tempUserPackage->getProductName();
-                                                    $plannameLanguage = $translations->getValue(PRODUCT_NAME, $tempUserPackage->packageGroupInfo['productid'], $languageKey, $planname);
-                                                    $productGroupName = $tempUserPackage->getProductGroupName();
-                                                    $productGroupNameLanguage = $translations->getValue(PRODUCT_GROUP_NAME, $tempUserPackage->packageGroupInfo['productgroupid'], $languageKey, $productGroupName);
-
-                                                    //Replace product name from default language to customer language
-                                                    $tempEntryDescription = str_replace($planname, $plannameLanguage, $tempEntryDescription);
-
-                                                    //Replace product group name from default language to customer language
-                                                    $tempEntryDescription = str_replace($productGroupName, $productGroupNameLanguage, $tempEntryDescription);
-
-                                                    $packageID = $tempUserPackage->getReference(true, true, $tempEntryDescription, $languageKey);
-                                                }else{
-                                                    $packageID = $tempUserPackage->getReference(true, true, $tempEntryDescription);
-                                                }
-                                            }
-                                            $invoice_label = $packageID.(($packageID != '')? ' - ':'').$tempEntryDescription;
-                                        } else {
-                                            $invoice_label = $tempEntryDescription;
-                                        }
-
-                                        if(count($languages) > 1 && $tempInvoiceEntry->AppliesTo() > 0 && $tempUserPackage->existsInDB()){
-                                            $planname = $tempUserPackage->getProductName();
-                                            $plannameLanguage = $translations->getValue(PRODUCT_NAME, $tempUserPackage->packageGroupInfo['productid'], $languageKey, $planname);
-                                            $productGroupName = $tempUserPackage->getProductGroupName();
-                                            $productGroupNameLanguage = $translations->getValue(PRODUCT_GROUP_NAME, $tempUserPackage->packageGroupInfo['productgroupid'], $languageKey, $productGroupName);
-
-                                            //Replace product name from default language to customer language
-                                            $invoice_label = str_replace($planname, $plannameLanguage, $invoice_label);
-
-                                            //Replace product group name from default language to customer language
-                                            $invoice_label = str_replace($productGroupName, $productGroupNameLanguage, $invoice_label);
-                                        }
-
+                                        $invoice_label = $InvoiceEntriesGateway->getFullEntryDescription($tempInvoiceEntry->getId(), $languageKey);
                                         $tempDescription .="\n" . $invoice_label;
 
                                         $daterangearray = unserialize($this->settings->get('Invoice Entry Date Range Format'));
