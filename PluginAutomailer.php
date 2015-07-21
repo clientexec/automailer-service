@@ -1000,8 +1000,8 @@ class PluginAutomailer extends ServicePlugin
         // DATE_FORMAT() below is used to normalize date-only fields to date-time
         switch ($rule['operator_dates']) {
             case Notification::DATE_OPERATOR_WAS_EXACTLY:
-                $conditions[] = "TIME_TO_SEC(TIMEDIFF('$now', DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'))) > $valueDec";
-                $conditions[] = "TIME_TO_SEC(TIMEDIFF('$now', DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'))) <= $value";
+                $conditions[] = "TIME_TO_SEC(TIMEDIFF('$now', DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'))) >= $value";
+                $conditions[] = "TIME_TO_SEC(TIMEDIFF('$now', DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'))) < $valueInc";
                 break;
             case Notification::DATE_OPERATOR_WAS_LESS_THAN:
                 $conditions[] = "TIME_TO_SEC(TIMEDIFF('$now', DATE_FORMAT($field, '%Y-%m-%d %H:%i:%s'))) > 0";
