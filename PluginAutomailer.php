@@ -306,6 +306,10 @@ class PluginAutomailer extends ServicePlugin
                                     $additionalEmailTags["[INVOICENUMBER]"]      = $tInvoiceID;
                                     $additionalEmailTags["[SUBSCRIPTION_ID]"]    = $tempInvoice->getSubscriptionID();
                                     $additionalEmailTags["[INVOICEDESCRIPTION]"] = $user->isHTMLMails() ? nl2br($tempDescription) : $tempDescription;
+
+                                    include_once 'modules/billing/models/BillingGateway.php';
+                                    $billingGateway = new BillingGateway( $this->user );
+                                    $additionalEmailTags["[DIRECTPAYMENTLINK]"] = $billingGateway->createDirectPaymentLink($user, $tInvoiceID);
                                 }
 
                                 // * Parse a copy of the email template and the email subject template
