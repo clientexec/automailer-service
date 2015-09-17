@@ -352,7 +352,7 @@ class PluginAutomailer extends ServicePlugin
                                 }
 
                                 // * Add Customer to summary
-                                $summaryNames[$AutomailerRule->getName()][] = $user->getFullName().((isset($row['package_id']))? ', package: '.$row['package_id'] : '').((isset($row['invoice_id']))? ', invoice: '.$row['invoice_id'] : '');
+                                $summaryNames[$AutomailerRule->getName()][] = $user->getFullName(true).((isset($row['package_id']))? ', package: '.$row['package_id'] : '').((isset($row['invoice_id']))? ', invoice: '.$row['invoice_id'] : '');
                                 $numCustomers++;
                             }
                         }
