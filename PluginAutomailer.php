@@ -233,6 +233,7 @@ class PluginAutomailer extends ServicePlugin
                                 // * Instantiate the user
                                 $user = new User($row['customer_id']);
                                 $languageKey = ucfirst(strtolower($user->getRealLanguage()));
+                                CE_Lib::setI18n($languageKey);
 
                                 // * Create a copy of the email template
                                 $strEmailArr     = $strEmailArrT;
