@@ -325,6 +325,10 @@ class PluginAutomailer extends ServicePlugin
                                     $strEmailArr = str_replace(array_keys($additionalEmailTags), $additionalEmailTags, $strEmailArr);
                                 }
 
+                                //Need to replace this tags here for the Email Event to save the content with the tags replaced.
+                                $strSubjectEmail = $mailGateway->replaceMailTags($strSubjectEmail, $user);
+                                $strEmailArr = $mailGateway->replaceMailTags($strEmailArr, $user);
+
                                 // * Send a parsed copy of the email template to the customer
                                 $mailerResult = $mailGateway->mailMessage(
                                     $strEmailArr,
